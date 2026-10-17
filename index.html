@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zombie Life Check</title>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #080f16;
+  color: #e2f5ee;
+  font-family: Arial, sans-serif;
+  text-align: center;
+}
+main {
+  max-width: 460px;
+  margin: auto;
+  padding: 12px;
+}
+h1 {
+  margin: 8px 0;
+  color: #74f5b1;
+  font-size: 25px;
+}
+.subtitle, .help, #best, #timeNote {
+  color: #98b4ac;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.panel {
+  margin: 9px 0;
+  padding: 10px;
+  border: 1px solid #315647;
+  border-radius: 12px;
+  background: #14232c;
+}
+.options, .stats {
+  display: grid;
+  gap: 6px;
+  margin: 9px 0;
+}
+.options { grid-template-columns: repeat(3, 1fr); }
+.stats { grid-template-columns: repeat(4, 1fr); }
+.stat {
+  padding: 8px 2px;
+  border-radius: 8px;
+  background: #14232c;
+  color: #98b4ac;
+  font-size: 10px;
+}
+.stat b {
+  display: block;
+  margin-top: 4px;
+  color: white;
+  font-size: 18px;
+}
+button {
+  padding: 12px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: #233e4b;
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button:disabled { opacity: .35; }
+button:focus-visible { outline: 3px solid white; }
+.selected {
+  border-color: #74f5b1;
+  background: #204b3b;
+  color: #a4ffce;
+}
+.options button {
+  padding: 10px 3px;
+  font-size: 12px;
+}
+.panic-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.track {
+  height: 15px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #080f16;
+}
+#panicFill {
+  width: 0%;
+  height: 100%;
+  background: #74f5b1;
+  transition: width 0.2s;
+}
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 6 / 5;
+  border-radius: 12px;
+  background: #101f29;
+}
+#readings {
+  min-height: 43px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.rule {
+  font-size: 12px;
+  color: #b8d9cc;
+  margin-bottom: 8px;
+}
+progress {
+  width: 100%;
+  height: 12px;
+  accent-color: #74f5b1;
+}
+.row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.row button { flex: 1; }
+#safe, #start {
+  background: #74f5b1;
+  color: #09251a;
+}
+#unsafe {
+  background: #ffbd76;
+  color: #38200c;
+}
+#message {
+  min-height: 40px;
+  margin: 8px 0;
+  color: #b8d9cc;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 10px;
+}
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  gap: 5px;
+}
+.pad button {
+  min-height: 44px;
+  padding: 8px 0;
+  font-size: 19px;
+}
+.up { grid-column: 2; }
+.left { grid-column: 1; }
+#scan {
+  width: 125px;
+  min-height: 85px;
+  background: #65ccec;
+  color: #092633;
+}
+#pause {
+  background: #d2dcf2;
+  color: #142139;
+}
+#summary {
+  display: none;
+  white-space: pre-line;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.7;
+}
+</style>
+</head>
+<body>
+<main>
+<h1>ZOMBIE LIFE CHECK</h1>
+<div class="subtitle" id="roundLabel">QUARANTINE MISSION • ROUND 1 / 5</div>
+
+<div class="panel">
+  <div class="rule">SELECT TIME PER ROUND</div>
+  <div class="options">
+    <button data-seconds="30" class="selected" aria-pressed="true">30 seconds</button>
+    <button data-seconds="60" aria-pressed="false">1 minute</button>
+    <button data-seconds="90" aria-pressed="false">1 minute<br>30 seconds</button>
+  </div>
+  <div id="timeNote">Your selection applies to all five rounds.</div>
+  <div id="best">Best score: 0</div>
+</div>
+
+<div class="stats">
+  <div class="stat">TIME<b id="time">0:30</b></div>
+  <div class="stat">STABILITY<b id="stability">100</b></div>
+  <div class="stat">TOTAL SCORE<b id="score">0</b></div>
+  <div class="stat">COMBO<b id="combo">0</b></div>
+</div>
+
+<div class="panel">
+  <div class="panic-label">
+    <span id="panicState">○ PANIC — CALM</span>
+    <span id="panicValue">0%</span>
+  </div>
+  <div class="track" id="panicTrack" role="progressbar" aria-label="Panic level">
+    <div id="panicFill"></div>
+  </div>
+  <canvas id="field" width="600" height="500"></canvas>
+  <div id="readings">Press START to begin quarantine scan.</div>
+  <progress id="roundProgress" value="0" max="100"></progress>
+</div>
+
+<div id="message">Use D-pad to move scanner. Hit SCAN when target is in range. SAFE = human, UNSAFE = zombie.</div>
+
+<div class="panel">
+  <div class="controls">
+    <div class="pad">
+      <button class="up" data-dir="up">▲</button>
+      <button class="left" data-dir="left">◀</button>
+      <button data-dir="down">▼</button>
+      <button data-dir="right">▶</button>
+    </div>
+    <button id="scan">◉ SCAN</button>
+    <button id="pause">II</button>
+  </div>
+  <div class="row">
+    <button id="safe">SAFE</button>
+    <button id="unsafe">UNSAFE</button>
+    <button id="start">START</button>
+  </div>
+  <div id="summary"></div>
+</div>
+<div class="help">Tip: High panic shakes the scanner. Stay calm, chain correct checks for combo bonus.</div>
+</main>
+<script>
+const canvas = document.getElementById('field');
+const ctx = canvas.getContext('2d');
+const timeEl = document.getElementById('time');
+const stabilityEl = document.getElementById('stability');
+const scoreEl = document.getElementById('score');
+const comboEl = document.getElementById('combo');
+const panicFill = document.getElementById('panicFill');
+const panicValue = document.getElementById('panicValue');
+const panicState = document.getElementById('panicState');
+const readings = document.getElementById('readings');
+const roundProgress = document.getElementById('roundProgress');
+const roundLabel = document.getElementById('roundLabel');
+const message = document.getElementById('message');
+const bestEl = document.getElementById('best');
+const summary = document.getElementById('summary');
+
+let secondsPerRound = 30;
+let round = 1;
+let totalRounds = 5;
+let timeLeft = secondsPerRound;
+let timer = null;
+let running = false;
+let paused = false;
+let score = 0;
+let stability = 100;
+let combo = 0;
+let panic = 0;
+let best = parseInt(localStorage.getItem('zombieBest')||'0');
+bestEl.textContent = 'Best score: ' + best;
+
+let scanner = { x: 300, y: 250, r: 70 };
+let target = null;
+let targetType = 'human';
+let targetsChecked = 0;
+
+function randTarget(){
+  const isZombie = Math.random() < 0.5;
+  targetType = isZombie ? 'zombie' : 'human';
+  target = {
+    x: 60 + Math.random()*480,
+    y: 60 + Math.random()*380,
+    pulse: 0
+  };
+  const vitals = isZombie ? 
+    `HR:${90+Math.floor(Math.random()*60)} • TEMP:${38+Math.random().toFixed(1)}°C • ⚠ NECROTIC` :
+    `HR:${65+Math.floor(Math.random()*25)} • TEMP:${36+Math.random().toFixed(1)}°C • ✓ STABLE`;
+  readings.textContent = `SIGNAL LOCKING... ${vitals}`;
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.strokeStyle = '#1b3240';
+  ctx.lineWidth = 1;
+  for(let i=0;i<canvas.width;i+=40){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,500); ctx.stroke(); }
+  for(let j=0;j<500;j+=40){ ctx.beginPath(); ctx.moveTo(0,j); ctx.lineTo(600,j); ctx.stroke(); }
+
+  if(target){
+    const shake = panic * 0.3;
+    const tx = target.x + (Math.random()-0.5)*shake;
+    const ty = target.y + (Math.random()-0.5)*shake;
+    target.pulse += 0.08;
+    const pr = 18 + Math.sin(target.pulse)*6;
+    ctx.fillStyle = targetType==='zombie' ? 'rgba(255,120,80,0.25)' : 'rgba(116,245,177,0.25)';
+    ctx.beginPath(); ctx.arc(tx,ty, pr+20,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = targetType==='zombie' ? '#ff8c5a' : '#74f5b1';
+    ctx.beginPath(); ctx.arc(tx,ty, pr,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#080f16';
+    ctx.font = '14px Arial';
+    ctx.textAlign='center';
+    ctx.fillText(targetType==='zombie'?'?':'♥', tx, ty+5);
+  }
+
+  const sx = scanner.x + (Math.random()-0.5)*(panic*0.2);
+  const sy = scanner.y + (Math.random()-0.5)*(panic*0.2);
+  ctx.strokeStyle = '#65ccec';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(sx,sy, scanner.r,0,Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sx-scanner.r, sy); ctx.lineTo(sx+scanner.r, sy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sx, sy-scanner.r); ctx.lineTo(sx, sy+scanner.r); ctx.stroke();
+  ctx.fillStyle = 'rgba(101,204,236,0.1)';
+  ctx.beginPath(); ctx.arc(sx,sy, scanner.r,0,Math.PI*2); ctx.fill();
+}
+
+function updateHUD(){
+  const m = Math.floor(timeLeft/60);
+  const s = timeLeft % 60;
+  timeEl.textContent = `${m}:${String(s).padStart(2,'0')}`;
+  stabilityEl.textContent = stability;
+  scoreEl.textContent = score;
+  comboEl.textContent = combo;
+  panicFill.style.width = panic+'%';
+  panicFill.style.background = panic>70 ? '#ff6b6b' : panic>40 ? '#ffbd76' : '#74f5b1';
+  panicValue.textContent = Math.round(panic)+'%';
+  panicState.textContent = panic>70 ? '● PANIC — CRITICAL' : panic>40 ? '◐ PANIC — RISING' : '○ PANIC — CALM';
+  roundProgress.value = ((secondsPerRound - timeLeft)/secondsPerRound)*100;
+  roundLabel.textContent = `QUARANTINE MISSION • ROUND ${round} / ${totalRounds}`;
+}
+
+function loop(){ draw(); if(running && !paused) requestAnimationFrame(loop); }
+
+document.querySelectorAll('[data-seconds]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    if(running) return;
+    document.querySelectorAll('[data-seconds]').forEach(x=>{x.classList.remove('selected'); x.setAttribute('aria-pressed','false')});
+    b.classList.add('selected'); b.setAttribute('aria-pressed','true');
+    secondsPerRound = parseInt(b.dataset.seconds);
+    timeLeft = secondsPerRound;
+    updateHUD();
+  });
+});
+
+function startRound(){
+  if(round>totalRounds){ endGame(); return; }
+  timeLeft = secondsPerRound;
+  stability = 100;
+  panic = 0;
+  targetsChecked = 0;
+  randTarget();
+  running = true;
+  paused = false;
+  summary.style.display='none';
+  message.textContent='Scan subjects. Stay calm.';
+  if(timer) clearInterval(timer);
+  timer = setInterval(()=>{
+    if(paused) return;
+    timeLeft--;
+    if(timeLeft%3===0) panic = Math.max(0, panic-1);
+    if(timeLeft<=0){ nextRound(); }
+    updateHUD();
+  },1000);
+  loop();
+  updateHUD();
+}
+
+function nextRound(){
+  clearInterval(timer);
+  running=false;
+  round++;
+  if(round<=totalRounds){
+    message.textContent=`Round ${round-1} complete! Starting round ${round}...`;
+    setTimeout(startRound,1200);
+  } else {
+    endGame();
+  }
+}
+
+function endGame(){
+  running=false;
+  clearInterval(timer);
+  if(score>best){ best=score; localStorage.setItem('zombieBest',best); bestEl.textContent='Best score: '+best; }
+  summary.style.display='block';
+  summary.textContent=`MISSION COMPLETE\nRounds: ${totalRounds}\nFinal Score: ${score}\nBest: ${best}\nStability: ${stability}%\n\nPress START to play again.`;
+  message.textContent='Quarantine complete. Debrief ready.';
+  round=1;
+}
+
+function checkDistance(){
+  if(!target) return Infinity;
+  const dx = scanner.x - target.x;
+  const dy = scanner.y - target.y;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+function handleScan(){
+  if(!running || paused) return;
+  const dist = checkDistance();
+  if(dist > scanner.r){
+    stability = Math.max(0, stability-5);
+    panic = Math.min(100, panic+12);
+    combo=0;
+    readings.textContent = 'NO SIGNAL • Move closer!';
+    message.textContent='Missed! Scanner out of range.';
+  } else {
+    readings.textContent = `TARGET ACQUIRED • ${targetType.toUpperCase()} SIGNATURE • CLASSIFY!`;
+    panic = Math.min(100, panic+3);
+  }
+  updateHUD();
+}
+
+function classify(isSafe){
+  if(!running || !target) return;
+  const dist = checkDistance();
+  if(dist > scanner.r){ message.textContent='Get in range first, then classify.'; return; }
+  const correct = (isSafe && targetType==='human') || (!isSafe && targetType==='zombie');
+  if(correct){
+    const pts = 100 + combo*25 + Math.floor((100-panic));
+    score += pts;
+    combo++;
+    stability = Math.min(100, stability+2);
+    panic = Math.max(0, panic-8);
+    message.textContent=`Correct! +${pts} pts • ${targetType.toUpperCase()} contained.`;
+  } else {
+    score = Math.max(0, score-75);
+    combo=0;
+    stability = Math.max(0, stability-15);
+    panic = Math.min(100, panic+20);
+    message.textContent=`WRONG! It was ${targetType.toUpperCase()}! Quarantine breach.`;
+  }
+  targetsChecked++;
+  randTarget();
+  updateHUD();
+}
+
+document.getElementById('scan').addEventListener('click', handleScan);
+document.getElementById('safe').addEventListener('click', ()=>classify(true));
+document.getElementById('unsafe').addEventListener('click', ()=>classify(false));
+document.getElementById('start').addEventListener('click', ()=>{
+  if(!running){ round=1; score=0; combo=0; startRound(); }
+});
+document.getElementById('pause').addEventListener('click', ()=>{
+  if(!running) return;
+  paused=!paused;
+  document.getElementById('pause').textContent = paused ? '▶' : 'II';
+  message.textContent = paused ? 'Paused.' : 'Resumed.';
+  if(!paused) loop();
+});
+
+document.querySelectorAll('[data-dir]').forEach(b=>{
+  let hold=null;
+  const move = ()=>{
+    if(!running || paused) return;
+    const step=12;
+    if(b.dataset.dir==='up') scanner.y=Math.max(40, scanner.y-step);
+    if(b.dataset.dir==='down') scanner.y=Math.min(460, scanner.y+step);
+    if(b.dataset.dir==='left') scanner.x=Math.max(40, scanner.x-step);
+    if(b.dataset.dir==='right') scanner.x=Math.min(560, scanner.x+step);
+  };
+  b.addEventListener('pointerdown', (e)=>{ e.preventDefault(); move(); hold=setInterval(move,80); });
+  b.addEventListener('pointerup', ()=>clearInterval(hold));
+  b.addEventListener('pointerleave', ()=>clearInterval(hold));
+});
+
+window.addEventListener('keydown', (e)=>{
+  if(e.key==='ArrowUp') scanner.y=Math.max(40, scanner.y-12);
+  if(e.key==='ArrowDown') scanner.y=Math.min(460, scanner.y+12);
+  if(e.key==='ArrowLeft') scanner.x=Math.max(40, scanner.x-12);
+  if(e.key==='ArrowRight') scanner.x=Math.min(560, scanner.x+12);
+  if(e.key===' ') handleScan();
+});
+
+updateHUD();
+draw();
+</script>
+</body>
+</html>
